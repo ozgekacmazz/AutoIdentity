@@ -33,12 +33,12 @@ while True:
 
         simdiki_zaman = time.time()
         if simdiki_zaman - son_kayit_zamani > kayit_araligi:
-            # ✅ En son eklenen kimlik_id'yi alıyoruz
+            #  En son eklenen kimlik_id'yi alıyoruz
             cursor.execute("SELECT id FROM kimlik_bilgileri ORDER BY id DESC LIMIT 1")
             son_kimlik = cursor.fetchone()
             kimlik_id = son_kimlik[0] if son_kimlik else None
 
-            # ✅ Yüz kaydını oluşturuyoruz
+            # Yüz kaydını oluşturuyoruz
             zaman = datetime.now().strftime("%Y%m%d_%H%M%S")
             dosya_adi = f"kayitlar/yuz_{zaman}.jpg"
             cv2.imwrite(dosya_adi, frame[y:y+h, x:x+w])

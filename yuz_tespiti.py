@@ -24,17 +24,17 @@ print("Okunan Metin:\n", metin)
 # 4. Ayıklanan Bilgiler
 ad, soyad, tc = "", "", ""
 
-# ✅ Adı bul (ADI veya NAME sonrası ilk düzgün kelime)
+#  Adı bul (ADI veya NAME sonrası ilk düzgün kelime)
 match_ad = re.search(r"(ADI|AD|NAME)[^\n]*\n+([A-Za-zÇĞİÖŞÜçğıöşü]+)", metin, re.IGNORECASE)
 if match_ad:
     ad = match_ad.group(2).strip().title()
 
-# ✅ Soyadı bul (SOYADI veya SURNAME sonrası ilk düzgün kelime)
+#  Soyadı bul (SOYADI veya SURNAME sonrası ilk düzgün kelime)
 match_soyad = re.search(r"(SOYADI|SOYAD|SURNAME)[^\n]*\n+([A-Za-zÇĞİÖŞÜçğıöşü]+)", metin, re.IGNORECASE)
 if match_soyad:
     soyad = match_soyad.group(2).strip().title()
 
-# ✅ TC bul (11 rakam)
+#  TC bul (11 rakam)
 match_tc = re.search(r"\b\d{11}\b", metin)
 if match_tc:
     tc = match_tc.group(0)
