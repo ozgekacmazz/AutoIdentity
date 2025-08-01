@@ -10,6 +10,168 @@ import re
 import cv2
 import numpy as np
 from datetime import datetime
+from difflib import SequenceMatcher
+
+# Gelişmiş regex pattern'ları
+AD_PATTERNS = [
+    r"(?:ADI|NAME|GIVEN\s+NAMES?|A\)\s*GIVEN\s*NAMES?\))[\s:]*\n*([A-ZÇĞİÖŞÜÇĞI\s]{2,})",
+    r"(?:Ad[ıi]|Name)[\s:]*\n*([A-ZÇĞİÖŞÜÇĞI\s]{2,})"
+    # Başlık satırlarını hariç tut
+]
+
+SOYAD_PATTERNS = [
+    r"(?:SOYADI|SURNAME|FAMILY\s+NAME)[\s:]*\n*([A-ZÇĞİÖŞÜÇĞI\s]{2,})",
+    r"(?:Soyad[ıi]|Surname)[\s:]*\n*([A-ZÇĞİÖŞÜÇĞI\s]{2,})"
+    # Başlık satırlarını hariç tut
+]
+
+TC_PATTERNS = [
+    r"\b(\d{11})\b",  # Standart 11 haneli
+    r"TC[:\s]*(\d{11})",  # TC: ile başlayan
+    r"(\d{3}\s\d{3}\s\d{3}\s\d{2})",  # Boşluklu format
+    r"(\d{3}-\d{3}-\d{3}-\d{2})"  # Tire ile ayrılmış
+]
+
+def calculate_similarity(str1, str2):
+    """İki string arasındaki benzerliği hesaplar (0-1 arası)."""
+    if not str1 or not str2:
+        return 0.0
+    return SequenceMatcher(None, str1.lower(), str2.lower()).ratio()
+
+def find_best_match(target, candidates, threshold=0.6):
+    """En iyi eşleşmeyi bulur."""
+    best_match = None
+    best_score = 0
+    
+    for candidate in candidates:
+        score = calculate_similarity(target, candidate)
+        if score > best_score and score >= threshold:
+            best_score = score
+            best_match = candidate
+    
+    return best_match, best_score
+
+def extract_with_flexible_regex(text, patterns, field_name=""):
+    """Esnek regex ile bilgi ayıklar."""
+    text_upper = text.upper()
+    
+    for pattern in patterns:
+        matches = re.finditer(pattern, text_upper, re.IGNORECASE | re.MULTILINE)
+        for match in matches:
+            extracted = match.group(1).strip()
+            if extracted and len(extracted) >= 2:
+                print(f"   🔍 {field_name} bulundu (regex): {extracted}")
+                return extracted.title()
+    
+    return ""
+
+def smart_extract_name_info(satirlar, tc=""):
+    """Akıllı ad/soyad ayıklama."""
+    ad, soyad = "", ""
+    
+    # 1. Regex ile etiketli arama
+    for i, satir in enumerate(satirlar):
+        # Ad arama
+        if not ad:
+            for pattern in AD_PATTERNS:
+                match = re.search(pattern, satir, re.IGNORECASE)
+                if match:
+                    ad = match.group(1).strip().title()
+                    print(f"   📝 Ad regex ile bulundu: {ad}")
+                    break
+        
+        # Soyad arama
+        if not soyad:
+            for pattern in SOYAD_PATTERNS:
+                match = re.search(pattern, satir, re.IGNORECASE)
+                if match:
+                    soyad = match.group(1).strip().title()
+                    print(f"   📝 Soyad regex ile bulundu: {soyad}")
+                    break
+    
+    # 2. Etiket sonrası satır arama
+    if not ad or not soyad:
+        for i, satir in enumerate(satirlar):
+            # Ad etiketleri sonrası
+            if any(etiket in satir.upper() for etiket in ["ADI", "NAME", "GIVEN NAMES"]):
+                if i + 1 < len(satirlar):
+                    alt_satir = satirlar[i + 1].strip()
+                    if alt_satir.replace(" ", "").isalpha() and len(alt_satir) >= 2:
+                        if not ad:
+                            ad = alt_satir.title()
+                            print(f"   📝 Ad alt satırdan bulundu: {ad}")
+            
+            # Soyad etiketleri sonrası
+            if any(etiket in satir.upper() for etiket in ["SOYADI", "SURNAME"]):
+                if i + 1 < len(satirlar):
+                    alt_satir = satirlar[i + 1].strip()
+                    if alt_satir.replace(" ", "").isalpha() and len(alt_satir) >= 2:
+                        if not soyad:
+                            soyad = alt_satir.title()
+                            print(f"   📝 Soyad alt satırdan bulundu: {soyad}")
+    
+    # 3. Akıllı tahmin (sadece harfli satırlar, başlık hariç)
+    if not ad or not soyad:
+        # Başlık satırlarını filtrele
+        baslik_kelimeleri = ["TÜRKİYE", "CUMHURİYETİ", "KİMLİK", "KARTI", "IDENTITY", "CARD", "REPUBLIC"]
+        aday_satirlar = []
+        
+        for s in satirlar:
+            s_clean = s.strip()
+            if (s_clean.replace(" ", "").isalpha() and 
+                2 <= len(s_clean) <= 20 and
+                not any(baslik in s_clean.upper() for baslik in baslik_kelimeleri)):
+                aday_satirlar.append(s_clean)
+        
+        # TC'nin yanındaki kelimeyi kontrol et
+        if not soyad:
+            for s in satirlar:
+                if tc and tc in s:
+                    # TC'den sonraki kelimeleri al
+                    tc_sonrasi = s.replace(tc, "").strip()
+                    if tc_sonrasi and tc_sonrasi.replace(" ", "").isalpha():
+                        soyad = tc_sonrasi.title()
+                        print(f"   🤖 Soyad TC yanından bulundu: {soyad}")
+                        break
+        
+        if len(aday_satirlar) >= 2:
+            # En uzun olanı ad, diğeri soyad olabilir
+            aday_satirlar = sorted(aday_satirlar, key=len, reverse=True)
+            
+            if not ad:
+                ad = aday_satirlar[0].title()
+                print(f"   🤖 Ad akıllı tahmin ile: {ad}")
+            
+            if not soyad and len(aday_satirlar) > 1:
+                soyad = aday_satirlar[1].title()
+                print(f"   🤖 Soyad akıllı tahmin ile: {soyad}")
+    
+    return ad, soyad
+
+def extract_tc_with_validation(satirlar, test_mode=False):
+    """TC numarasını esnek regex ile ayıklar ve doğrular."""
+    tc = ""
+    
+    # 1. Farklı regex pattern'ları ile arama
+    for satir in satirlar:
+        for pattern in TC_PATTERNS:
+            match = re.search(pattern, satir)
+            if match:
+                tc_candidate = match.group(1).replace(" ", "").replace("-", "")
+                if len(tc_candidate) == 11 and tc_candidate.isdigit():
+                    tc = tc_candidate
+                    print(f"   🔢 TC bulundu: {tc}")
+                    break
+        if tc:
+            break
+    
+    # 2. TC doğrulama (test modunda kapalı)
+    if tc and not test_mode:
+        if not validate_tc_number(tc):
+            print(f"   ⚠️  Geçersiz TC: {tc}")
+            tc = ""
+    
+    return tc
 
 def improve_image_for_ocr(image_path, save_improved=False):
     """
@@ -132,90 +294,31 @@ def bilgi_ayikla(image_path, test_mode=False, use_improvement=True):
     # Metni temizle
     metin = clean_text(metin)
     
-    # Anahtar kelime kontrolü
-    anahtarlar = ["ADI", "SOYADI", "T.C.", "SURNAME", "NAME", "KİMLİK", "IDENTITY"]
+    # Anahtar kelime kontrolü (daha esnek)
+    anahtarlar = ["ADI", "SOYADI", "T.C.", "SURNAME", "NAME", "KİMLİK", "IDENTITY", "CUMHURİYETİ", "REPUBLIC"]
     if not any(kelime in metin.upper() for kelime in anahtarlar):
         log_operation("İÇERİK KONTROLÜ", "OCR çıktısı anlamlı değil. Beklenen kimlik etiketleri bulunamadı.", False)
         return "", "", ""
     
-    # Bilgi ayıklama
-    ad, soyad, tc = "", "", ""
+    # Gelişmiş bilgi ayıklama
     satirlar = [s.strip() for s in metin.split('\n') if s.strip()]
     
-    # TC ayıkla (11 haneli rakam)
-    for satir in satirlar:
-        match = re.search(r"\b\d{11}\b", satir)
-        if match:
-            tc = match.group(0)
-            break
+    print(f"   📋 Toplam {len(satirlar)} satır analiz ediliyor...")
+    print(f"   📄 Satırlar: {satirlar}")
     
-    # TC numarasının geçerliliğini kontrol et (test modunda kapalı)
-    if not test_mode and tc and not validate_tc_number(tc):
-        log_operation("TC DOĞRULAMA", f"Geçersiz TC numarası: {tc}", False)
-        tc = ""
+    # 1. TC ayıklama (gelişmiş regex ile)
+    tc = extract_tc_with_validation(satirlar, test_mode)
     
-    # Etiketli veya etiketiz ad/soyad bulma
-    ad_etiketleri = ["ADI", "NAME", "GIVEN NAMES", "A) GIVEN NAMES)"]
-    soyad_etiketleri = ["SOYADI", "SURNAME"]
+    # 2. Ad ve soyad ayıklama (akıllı sistem ile)
+    ad, soyad = smart_extract_name_info(satirlar, tc)
     
-    # Adı bul
-    for i, satir in enumerate(satirlar):
-        for etiket in ad_etiketleri:
-            if etiket in satir.upper():
-                if i + 1 < len(satirlar):
-                    alt_satir = satirlar[i + 1]
-                    if alt_satir.replace(" ", "").isalpha():
-                        ad = alt_satir.title()
-                        break
-        if ad:
-            break
-    
-    # Soyadı bul
-    for i, satir in enumerate(satirlar):
-        for etiket in soyad_etiketleri:
-            if etiket in satir.upper():
-                if i + 1 < len(satirlar):
-                    alt_satir = satirlar[i + 1]
-                    if alt_satir.replace(" ", "").isalpha():
-                        soyad = alt_satir.title()
-                        break
-        if soyad:
-            break
-    
-    # Eğer hala soyad bulunamadıysa, TC'nin bulunduğu satırda ad ve soyadı birlikte olabilir
-    def is_ad_soyad(s):
-        return s.replace(" ", "").isalpha() and 1 <= len(s.split()) <= 3
-    
-    if not soyad and tc:
-        for i, satir in enumerate(satirlar):
-            if tc in satir:
-                parcalar = satir.replace(tc, "").strip().split()
-                if parcalar:
-                    soyad_aday = parcalar[-1]
-                    if soyad_aday.isalpha():
-                        soyad = soyad_aday.title()
-                if not soyad and i > 0:
-                    ust_satir = satirlar[i-1].strip()
-                    if ust_satir.isalpha():
-                        soyad = ust_satir.title()
-                break
-    
-    # Eğer etiketli bulamazsa, ad ve soyadı tahmin et
-    if not ad or not soyad:
-        adaylar = [s for s in satirlar if is_ad_soyad(s)]
-        if len(adaylar) >= 2:
-            adaylar = sorted(adaylar, key=lambda x: len(x), reverse=True)
-            if not ad:
-                ad = adaylar[0].title()
-            if not soyad:
-                soyad = adaylar[1].title()
-    
-    # Son kontrol: ad ve soyad aynıysa, ayır
+    # 3. Son kontrol ve düzeltme
     if ad and soyad and ad == soyad:
         if " " in ad:
             parcalar = ad.split()
             ad = " ".join(parcalar[:-1])
             soyad = parcalar[-1]
+            print(f"   🔧 Ad/soyad ayrıldı: {ad} {soyad}")
     
     return ad, soyad, tc
 
