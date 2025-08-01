@@ -36,13 +36,14 @@ print("--------------------------\n")
 
 # 5. Bilgiler eksikse çık
 if not ad or not soyad or not tc:
-    log_operation("BİLGİ AYIKLAMA", "Ad, soyad veya T.C. numarası ayıklanamadı. Görüntü kalitesi yetersiz olabilir.", False)
+    log_operation("BİLGİ AYIKLAMA", "Ad, soyad veya T.C. numarası ayıklanamadı. Görüntü kalitesi yetersiz olabilir.",
+                  False)
     sys.exit()
 
 # 6. Veritabanı işlemleri
 try:
     db, cursor = get_db_connection()
-    
+
     # Aynı TC var mı?
     cursor.execute("SELECT id FROM kimlik_bilgileri WHERE tc = %s", (tc,))
     if cursor.fetchone():
@@ -53,9 +54,9 @@ try:
     sql = "INSERT INTO kimlik_bilgileri (ad, soyad, tc, tarih_saat) VALUES (%s, %s, %s, %s)"
     cursor.execute(sql, (ad, soyad, tc, datetime.now()))
     db.commit()
-    
+
     log_operation("KAYIT İŞLEMİ", f"{ad} {soyad} ({tc}) tabloya eklendi.", True)
-    
+
 except mysql.connector.Error as e:
     log_operation("VERİTABANI HATASI", f"Veritabanına kayıt sırasında hata: {e}", False)
 finally:

@@ -1,0 +1,42 @@
+{
+  "timestamp": "2025-08-01T17:59:59.796021",
+  "duration": 7.949728488922119,
+  "summary": {
+    "total_tests": 5,
+    "successful_tests": 2,
+    "failed_tests": 3,
+    "success_rate": 40.0
+  },
+  "results": {
+    "security": {
+      "success": true,
+      "output": null,
+      "error": "",
+      "return_code": 0
+    },
+    "unit": {
+      "success": false,
+      "output": "",
+      "error": "ERROR: usage: __main__.py [options] [file_or_dir] [file_or_dir] [...]\n__main__.py: error: unrecognized arguments: --json-report\n  inifile: None\n  rootdir: C:\\masaÃ¼stÃ¼\\pythonProject2\n\n",
+      "return_code": 4
+    },
+    "gui": {
+      "success": false,
+      "output": "",
+      "error": "ERROR: usage: __main__.py [options] [file_or_dir] [file_or_dir] [...]\n__main__.py: error: unrecognized arguments: --headless\n  inifile: None\n  rootdir: C:\\masaÃ¼stÃ¼\\pythonProject2\n\n",
+      "return_code": 4
+    },
+    "integration": {
+      "success": false,
+      "output": null,
+      "error": "",
+      "return_code": 1
+    },
+    "performance": {
+      "success": true,
+      "output": "============================= test session starts =============================\nplatform win32 -- Python 3.12.2, pytest-8.4.1, pluggy-1.6.0 -- C:\\Users\\ozkac\\AppData\\Local\\Programs\\Python\\Python312\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\masaÃ¼stÃ¼\\pythonProject2\ncollecting ... collected 2 items\n\ntest_gui.py::TestGUIPerformance::test_large_image_loading PASSED         [ 50%]\ntest_gui.py::TestGUIPerformance::test_multiple_image_processing PASSED   [100%]\n\n============================== 2 passed in 0.71s ==============================\n",
+      "error": "",
+      "return_code": 0
+    }
+  }
+}

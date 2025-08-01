@@ -1,0 +1,131 @@
+
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Raporu - Kimlik Tanıma Sistemi</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background-color: #f5f5f5; }
+        .container { max-width: 1200px; margin: 0 auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .header { text-align: center; margin-bottom: 30px; }
+        .summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px; }
+        .summary-card { background: #f8f9fa; padding: 20px; border-radius: 8px; text-align: center; }
+        .summary-card.success { background: #d4edda; color: #155724; }
+        .summary-card.failure { background: #f8d7da; color: #721c24; }
+        .test-category { margin-bottom: 30px; }
+        .test-category h3 { color: #333; border-bottom: 2px solid #007bff; padding-bottom: 10px; }
+        .test-result { background: #f8f9fa; padding: 15px; border-radius: 5px; margin: 10px 0; }
+        .test-result.success { border-left: 4px solid #28a745; }
+        .test-result.failure { border-left: 4px solid #dc3545; }
+        .timestamp { color: #666; font-size: 0.9em; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 5px; overflow-x: auto; font-size: 0.8em; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🧪 Test Raporu</h1>
+            <h2>Kimlik Tanıma Sistemi</h2>
+            <p class="timestamp">Oluşturulma: 2025-08-01T17:59:59.796021</p>
+            <p class="timestamp">Süre: 7.95 saniye</p>
+        </div>
+        
+        <div class="summary">
+            <div class="summary-card failure">
+                <h3>Başarı Oranı</h3>
+                <h2>40.0%</h2>
+            </div>
+            <div class="summary-card">
+                <h3>Toplam Test</h3>
+                <h2>5</h2>
+            </div>
+            <div class="summary-card success">
+                <h3>Başarılı</h3>
+                <h2>2</h2>
+            </div>
+            <div class="summary-card failure">
+                <h3>Başarısız</h3>
+                <h2>3</h2>
+            </div>
+        </div>
+        
+        <div class="test-details">
+
+            <div class="test-category">
+                <h3>✅ SECURITY Testleri</h3>
+                <div class="test-result success">
+                    <strong>Durum:</strong> Başarılı<br>
+                    <strong>Kod:</strong> 0<br>
+
+                </div>
+            </div>
+
+            <div class="test-category">
+                <h3>❌ UNIT Testleri</h3>
+                <div class="test-result failure">
+                    <strong>Durum:</strong> Başarısız<br>
+                    <strong>Kod:</strong> 4<br>
+
+                    <strong>Hata:</strong>
+                    <pre>ERROR: usage: __main__.py [options] [file_or_dir] [file_or_dir] [...]
+__main__.py: error: unrecognized arguments: --json-report
+  inifile: None
+  rootdir: C:\masaÃ¼stÃ¼\pythonProject2
+
+</pre>
+
+                </div>
+            </div>
+
+            <div class="test-category">
+                <h3>❌ GUI Testleri</h3>
+                <div class="test-result failure">
+                    <strong>Durum:</strong> Başarısız<br>
+                    <strong>Kod:</strong> 4<br>
+
+                    <strong>Hata:</strong>
+                    <pre>ERROR: usage: __main__.py [options] [file_or_dir] [file_or_dir] [...]
+__main__.py: error: unrecognized arguments: --headless
+  inifile: None
+  rootdir: C:\masaÃ¼stÃ¼\pythonProject2
+
+</pre>
+
+                </div>
+            </div>
+
+            <div class="test-category">
+                <h3>❌ INTEGRATION Testleri</h3>
+                <div class="test-result failure">
+                    <strong>Durum:</strong> Başarısız<br>
+                    <strong>Kod:</strong> 1<br>
+
+                </div>
+            </div>
+
+            <div class="test-category">
+                <h3>✅ PERFORMANCE Testleri</h3>
+                <div class="test-result success">
+                    <strong>Durum:</strong> Başarılı<br>
+                    <strong>Kod:</strong> 0<br>
+
+                    <strong>Çıktı:</strong>
+                    <pre>============================= test session starts =============================
+platform win32 -- Python 3.12.2, pytest-8.4.1, pluggy-1.6.0 -- C:\Users\ozkac\AppData\Local\Programs\Python\Python312\python.exe
+cachedir: .pytest_cache
+rootdir: C:\masaÃ¼stÃ¼\pythonProject2
+collecting ... collected 2 items
+
+test_gui.py::TestGUIPerformance::test_large_image_loading PASSED         [ 50%]
+test_gui.py::TestGUIPerformance::test_multiple_image_processing PASSED   [100%]
+
+============================== 2 p...</pre>
+
+                </div>
+            </div>
+
+        </div>
+    </div>
+</body>
+</html>
