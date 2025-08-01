@@ -7,24 +7,87 @@ import pytesseract
 import os
 import sys
 import re
+import cv2
+import numpy as np
 from datetime import datetime
 
-def get_db_connection():
-    """MySQL veritabanına bağlanır ve bağlantı ile cursor döner."""
+def improve_image_for_ocr(image_path, save_improved=False):
+    """
+    OCR için görseli akıllıca iyileştirir.
+    Sadece gerektiğinde iyileştirme uygular.
+    
+    Args:
+        image_path (str): Görsel dosya yolu
+        save_improved (bool): İyileştirilmiş görseli kaydet
+    
+    Returns:
+        PIL.Image: İyileştirilmiş görsel
+    """
     try:
-        db = mysql.connector.connect(
-            host="localhost",
-            user="root",
-            password="oz.12.eymo",  # TODO: .env dosyasına taşınacak
-            database="goruntu_proje"
-        )
-        cursor = db.cursor()
-        return db, cursor
-    except mysql.connector.Error as err:
-        print(f"Veritabanı bağlantı hatası: {err}")
-        sys.exit(1)
+        # Görseli OpenCV ile aç
+        image = cv2.imread(image_path)
+        if image is None:
+            raise ValueError(f"Görsel açılamadı: {image_path}")
+        
+        # 1. Gri tonlama
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        
+        # 2. Görsel kalitesini değerlendir
+        # Kontrast hesapla
+        contrast = gray.std()
+        # Ortalama parlaklık
+        brightness = gray.mean()
+        
+        print(f"   📊 Görsel Analizi: Kontrast={contrast:.1f}, Parlaklık={brightness:.1f}")
+        
+        # 3. Akıllı iyileştirme kararı
+        needs_improvement = False
+        
+        if contrast < 20:  # Düşük kontrast
+            print("   🔧 Düşük kontrast tespit edildi - iyileştirme uygulanıyor")
+            needs_improvement = True
+        elif brightness < 30 or brightness > 225:  # Aşırı karanlık/aydınlık
+            print("   🔧 Aşırı parlaklık tespit edildi - iyileştirme uygulanıyor")
+            needs_improvement = True
+        else:
+            print("   ✅ Görsel kalitesi yeterli - iyileştirme atlanıyor")
+        
+        if not needs_improvement:
+            # Orijinal görseli PIL formatında döndür
+            return Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+        
+        # 4. Hafif iyileştirme (aşırı agresif değil)
+        # Gürültü azaltma (çok hafif)
+        denoised = cv2.GaussianBlur(gray, (1, 1), 0)
+        
+        # Kontrast artırma (daha yumuşak)
+        clahe = cv2.createCLAHE(clipLimit=1.5, tileGridSize=(8,8))
+        enhanced = clahe.apply(denoised)
+        
+        # Threshold (daha yumuşak)
+        _, thresh = cv2.threshold(enhanced, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+        
+        # Morfolojik işlemler (çok hafif)
+        kernel = np.ones((1,1), np.uint8)
+        cleaned = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel)
+        
+        # OpenCV'den PIL'e çevir
+        improved_image = Image.fromarray(cleaned)
+        
+        # İyileştirilmiş görseli kaydet (opsiyonel)
+        if save_improved:
+            improved_path = image_path.replace('.png', '_improved.png').replace('.jpg', '_improved.jpg')
+            improved_image.save(improved_path)
+            print(f"   💾 İyileştirilmiş görsel kaydedildi: {improved_path}")
+        
+        return improved_image
+        
+    except Exception as e:
+        print(f"Görsel iyileştirme hatası: {e}")
+        # Hata durumunda orijinal görseli döndür
+        return Image.open(image_path)
 
-def ocr_image(image_path, lang="tur"):
+def ocr_image(image_path, lang="tur", use_improvement=True):
     """Verilen görsel yolundan OCR ile metin okur."""
     try:
         # Tesseract yolunu ayarla
@@ -34,8 +97,13 @@ def ocr_image(image_path, lang="tur"):
         if not os.path.exists(image_path):
             raise FileNotFoundError(f"Görsel dosyası bulunamadı: {image_path}")
         
-        # Görseli aç ve OCR işlemi yap
-        image = Image.open(image_path)
+        # Görsel iyileştirme uygula
+        if use_improvement:
+            image = improve_image_for_ocr(image_path)
+        else:
+            image = Image.open(image_path)
+        
+        # OCR işlemi yap
         metin = pytesseract.image_to_string(image, lang=lang)
         
         return metin.strip()
@@ -43,19 +111,20 @@ def ocr_image(image_path, lang="tur"):
         print(f"OCR işlemi sırasında hata: {e}")
         return ""
 
-def bilgi_ayikla(image_path, test_mode=False):
+def bilgi_ayikla(image_path, test_mode=False, use_improvement=True):
     """
     Kimlik fotoğrafından ad, soyad ve TC numarasını ayıklar.
     
     Args:
         image_path (str): Kimlik fotoğrafının dosya yolu
         test_mode (bool): Test modu (TC doğrulama kapalı)
+        use_improvement (bool): Görsel iyileştirme kullan
     
     Returns:
         tuple: (ad, soyad, tc) - Başarısız olursa boş string
     """
-    # OCR işlemi
-    metin = ocr_image(image_path)
+    # OCR işlemi (iyileştirme ile)
+    metin = ocr_image(image_path, use_improvement=use_improvement)
     if not metin:
         log_operation("OCR İŞLEMİ", "OCR sonucu boş. Görüntüde okunabilir bilgi yok.", False)
         return "", "", ""
@@ -149,6 +218,21 @@ def bilgi_ayikla(image_path, test_mode=False):
             soyad = parcalar[-1]
     
     return ad, soyad, tc
+
+def get_db_connection():
+    """MySQL veritabanına bağlanır ve bağlantı ile cursor döner."""
+    try:
+        db = mysql.connector.connect(
+            host="localhost",
+            user="root",
+            password="oz.12.eymo",  # TODO: .env dosyasına taşınacak
+            database="goruntu_proje"
+        )
+        cursor = db.cursor()
+        return db, cursor
+    except mysql.connector.Error as err:
+        print(f"Veritabanı bağlantı hatası: {err}")
+        sys.exit(1)
 
 def log_operation(operation_type, details, success=True):
     """İşlem loglarını kaydeder."""

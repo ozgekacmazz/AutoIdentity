@@ -2,7 +2,7 @@
 # Kimlik bilgi ayıklama algoritmasının otomatik test scripti
 
 import os
-from utils import bilgi_ayikla, log_operation
+from utils import bilgi_ayikla, log_operation, improve_image_for_ocr
 
 def test_bilgi_ayikla():
     """Farklı kimlik fotoğraflarını test eder."""
@@ -27,8 +27,8 @@ def test_bilgi_ayikla():
         print(f"🔍 Test ediliyor: {dosya}")
         
         try:
-            # Bilgi ayıklama (test modunda)
-            ad, soyad, tc = bilgi_ayikla(dosya, test_mode=True)
+            # Bilgi ayıklama (test modunda, iyileştirme ile)
+            ad, soyad, tc = bilgi_ayikla(dosya, test_mode=True, use_improvement=True)
             
             # Sonuçları göster
             print(f"   📋 Sonuçlar:")
@@ -64,6 +64,64 @@ def test_bilgi_ayikla():
     
     return basari_orani
 
+def test_improvement_comparison():
+    """Görsel iyileştirme öncesi ve sonrası karşılaştırması yapar."""
+    print("\n=== GÖRSEL İYİLEŞTİRME KARŞILAŞTIRMASI ===")
+    
+    test_dosyalari = ["Belge.png"]
+    
+    for dosya in test_dosyalari:
+        if not os.path.exists(dosya):
+            print(f"❌ {dosya} dosyası bulunamadı")
+            continue
+            
+        print(f"\n🔍 Karşılaştırma: {dosya}")
+        
+        # İyileştirme olmadan test
+        print("   📊 İyileştirme OLMADAN:")
+        ad1, soyad1, tc1 = bilgi_ayikla(dosya, test_mode=True, use_improvement=False)
+        print(f"      Ad: {ad1}, Soyad: {soyad1}, TC: {tc1}")
+        
+        # İyileştirme ile test
+        print("   📊 İyileştirme İLE:")
+        ad2, soyad2, tc2 = bilgi_ayikla(dosya, test_mode=True, use_improvement=True)
+        print(f"      Ad: {ad2}, Soyad: {soyad2}, TC: {tc2}")
+        
+        # Karşılaştırma
+        print("   📈 KARŞILAŞTIRMA:")
+        if ad1 and ad2 and ad1 == ad2:
+            print(f"      ✅ Ad: Aynı ({ad1})")
+        elif ad2 and not ad1:
+            print(f"      🎉 Ad: İyileştirme ile bulundu ({ad2})")
+        elif ad1 and not ad2:
+            print(f"      ⚠️  Ad: İyileştirme ile kayboldu (önceki: {ad1})")
+        else:
+            print(f"      ❌ Ad: Farklı (önceki: {ad1}, sonraki: {ad2})")
+            
+        if soyad1 and soyad2 and soyad1 == soyad2:
+            print(f"      ✅ Soyad: Aynı ({soyad1})")
+        elif soyad2 and not soyad1:
+            print(f"      🎉 Soyad: İyileştirme ile bulundu ({soyad2})")
+        elif soyad1 and not soyad2:
+            print(f"      ⚠️  Soyad: İyileştirme ile kayboldu (önceki: {soyad1})")
+        else:
+            print(f"      ❌ Soyad: Farklı (önceki: {soyad1}, sonraki: {soyad2})")
+            
+        if tc1 and tc2 and tc1 == tc2:
+            print(f"      ✅ TC: Aynı ({tc1})")
+        elif tc2 and not tc1:
+            print(f"      🎉 TC: İyileştirme ile bulundu ({tc2})")
+        elif tc1 and not tc2:
+            print(f"      ⚠️  TC: İyileştirme ile kayboldu (önceki: {tc1})")
+        else:
+            print(f"      ❌ TC: Farklı (önceki: {tc1}, sonraki: {tc2})")
+        
+        # İyileştirilmiş görseli kaydet
+        try:
+            improve_image_for_ocr(dosya, save_improved=True)
+        except Exception as e:
+            print(f"   ⚠️  İyileştirilmiş görsel kaydedilemedi: {e}")
+
 def test_farkli_formatlar():
     """Farklı kimlik formatlarını test eder."""
     print("\n=== FARKLI FORMAT TESTİ ===")
@@ -85,7 +143,7 @@ def test_farkli_formatlar():
         
         # Gerçek dosya varsa test et
         if os.path.exists("Belge.png"):
-            ad, soyad, tc = bilgi_ayikla("Belge.png", test_mode=True)
+            ad, soyad, tc = bilgi_ayikla("Belge.png", test_mode=True, use_improvement=True)
             print(f"   Gerçek: {ad} {soyad} ({tc})")
             
             # Karşılaştır
@@ -102,7 +160,10 @@ if __name__ == "__main__":
     # Ana test
     basari_orani = test_bilgi_ayikla()
     
+    # İyileştirme karşılaştırması
+    test_improvement_comparison()
+    
     # Format testi
     test_farkli_formatlar()
     
-    print(f"\n🏁 Test tamamlandı! Başarı oranı: %{basari_orani:.1f}") 
+    print(f"\n🏁 Test tamamlandı! Başarı oranı: %{basari_orani:.1f}")
