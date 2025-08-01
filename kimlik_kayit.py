@@ -1,82 +1,53 @@
-import pytesseract
-from PIL import Image
-import mysql.connector
-from datetime import datetime
 import re
 import sys
 import os
+import mysql.connector
+from datetime import datetime
+from utils import get_db_connection, ocr_image, log_operation, validate_tc_number, clean_text
 
-# 1. Tesseract Yolu
-try:
-    pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
-except Exception as e:
-    print("Tesseract yolu ayarlanamadı:", e)
-    sys.exit()
-
-# 2. Veritabanı Bağlantısı
-try:
-    db = mysql.connector.connect(
-        host="localhost",
-        user="root",
-        password="oz.12.eymo",
-        database="goruntu_proje"
-    )
-    cursor = db.cursor()
-except mysql.connector.Error as err:
-    print("Veritabanı bağlantı hatası:", err)
-    sys.exit()
-
-# 3. Görsel Yolu
-#resim_yolu = "Belge.png"
-#resim_yolu = "Belge (2).png"
+# 1. Görsel Yolu
 resim_yolu = "belge3.png"
 
-
-
-# 4. Görselin Açılabilirliğini Kontrol Et
+# 2. Görselin Açılabilirliğini Kontrol Et
 if not os.path.exists(resim_yolu):
-    print(f"Görsel dosyası bulunamadı: {resim_yolu}")
+    log_operation("DOSYA KONTROLÜ", f"Görsel dosyası bulunamadı: {resim_yolu}", False)
     sys.exit()
 
-try:
-    image = Image.open(resim_yolu)
-except Exception as e:
-    print(f"Görsel açılamadı veya bozuk: {e}")
+# 3. OCR İşlemi
+metin = ocr_image(resim_yolu)
+if not metin:
+    log_operation("OCR İŞLEMİ", "OCR sonucu boş. Görüntüde okunabilir bilgi yok.", False)
     sys.exit()
 
-# 5. OCR İşlemi
-try:
-    metin = pytesseract.image_to_string(image, lang="tur")
-except Exception as e:
-    print("OCR sırasında hata oluştu:", e)
-    sys.exit()
+# 4. Metni temizle
+metin = clean_text(metin)
 
-# 6. Metin boşsa çık
-if not metin.strip():
-    print("OCR sonucu boş. Görüntüde okunabilir bilgi yok.")
-    sys.exit()
-
-# 7. Anahtar Kelime Kontrolü
-anahtarlar = ["ADI", "SOYADI", "T.C.", "SURNAME", "NAME"]
+# 5. Anahtar Kelime Kontrolü
+anahtarlar = ["ADI", "SOYADI", "T.C.", "SURNAME", "NAME", "KİMLİK", "IDENTITY"]
 if not any(kelime in metin.upper() for kelime in anahtarlar):
-    print("OCR çıktısı anlamlı değil. Beklenen kimlik etiketleri bulunamadı.")
+    log_operation("İÇERİK KONTROLÜ", "OCR çıktısı anlamlı değil. Beklenen kimlik etiketleri bulunamadı.", False)
     sys.exit()
 
 print("Okunan Metin:\n", metin)
 
-# 8. Bilgi Ayıklama (Gelişmiş ve Esnek)
+# 6. Bilgi Ayıklama (Gelişmiş ve Esnek)
 ad, soyad, tc = "", "", ""
 
 satirlar = [s.strip() for s in metin.split('\n') if s.strip()]
 
-# 1. TC ayıkla (11 haneli rakam)
+# TC ayıkla (11 haneli rakam)
 for satir in satirlar:
     match = re.search(r"\b\d{11}\b", satir)
     if match:
         tc = match.group(0)
         break
 
-# 2. Etiketli veya etiketiz ad/soyad bulma
+# TC numarasının geçerliliğini kontrol et (TEST MODU - geçici olarak kapatıldı)
+# if tc and not validate_tc_number(tc):
+#     log_operation("TC DOĞRULAMA", f"Geçersiz TC numarası: {tc}", False)
+#     tc = ""  # Geçersiz TC'yi sıfırla
+
+# Etiketli veya etiketiz ad/soyad bulma
 ad_etiketleri = ["ADI", "NAME", "GIVEN NAMES", "A) GIVEN NAMES)"]
 soyad_etiketleri = ["SOYADI", "SURNAME"]
 
@@ -164,25 +135,32 @@ else:
     print("Soyad bulunamadı.")
 print("--------------------------\n")
 
-# 9. Bilgiler eksikse çık
+# 7. Bilgiler eksikse çık
 if not ad or not soyad or not tc:
-    print("Ad, soyad veya T.C. numarası ayıklanamadı. Görüntü kalitesi yetersiz olabilir.")
+    log_operation("BİLGİ AYIKLAMA", "Ad, soyad veya T.C. numarası ayıklanamadı. Görüntü kalitesi yetersiz olabilir.", False)
     sys.exit()
 
-# 10. Aynı TC var mı?
-cursor.execute("SELECT id FROM kimlik_bilgileri WHERE tc = %s", (tc,))
-if cursor.fetchone():
-    print(f"T.C. {tc} zaten kayıtlı. Yeni kayıt yapılmadı.")
-    sys.exit()
-
-# 11. Veritabanına Kayıt
+# 8. Veritabanı işlemleri
 try:
+    db, cursor = get_db_connection()
+    
+    # Aynı TC var mı?
+    cursor.execute("SELECT id FROM kimlik_bilgileri WHERE tc = %s", (tc,))
+    if cursor.fetchone():
+        log_operation("KAYIT KONTROLÜ", f"T.C. {tc} zaten kayıtlı. Yeni kayıt yapılmadı.", False)
+        sys.exit()
+
+    # Veritabanına Kayıt
     sql = "INSERT INTO kimlik_bilgileri (ad, soyad, tc, tarih_saat) VALUES (%s, %s, %s, %s)"
     cursor.execute(sql, (ad, soyad, tc, datetime.now()))
     db.commit()
-    print(f"[KAYIT ALINDI] {ad} {soyad} ({tc}) tabloya eklendi.")
+    
+    log_operation("KAYIT İŞLEMİ", f"{ad} {soyad} ({tc}) tabloya eklendi.", True)
+    
 except mysql.connector.Error as e:
-    print("Veritabanına kayıt sırasında hata:", e)
+    log_operation("VERİTABANI HATASI", f"Veritabanına kayıt sırasında hata: {e}", False)
 finally:
-    cursor.close()
-    db.close()
+    if 'cursor' in locals():
+        cursor.close()
+    if 'db' in locals():
+        db.close()
